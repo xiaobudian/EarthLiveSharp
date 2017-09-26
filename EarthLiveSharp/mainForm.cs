@@ -1,6 +1,9 @@
 ﻿using System;
 using System.Drawing;
+using System.IO;
 using System.Windows.Forms;
+using System.Linq;
+using System.Collections.Generic;
 
 namespace EarthLiveSharp
 {
@@ -12,12 +15,14 @@ namespace EarthLiveSharp
         MenuItem settingsMenu = new MenuItem("Settings");
         MenuItem quitService = new MenuItem("Quit");
         ContextMenu trayMenu = new ContextMenu();
-
+        List<string> Images = new List<string>();
         public mainForm()
         {
             InitializeComponent();
             createContextMenu();
             notifyIcon1.ContextMenu = trayMenu;
+
+
         }
         private void createContextMenu()
         {
@@ -48,7 +53,7 @@ namespace EarthLiveSharp
         }
         private void quitService_Click(object sender, EventArgs e)
         {
-            var confirmIfQuitting = MessageBox.Show("Are you sure you want to quit?","Stopping Service", MessageBoxButtons.YesNo);
+            var confirmIfQuitting = MessageBox.Show("Are you sure you want to quit?", "Stopping Service", MessageBoxButtons.YesNo);
             if (confirmIfQuitting == DialogResult.Yes)
             {
                 stopLogic();
@@ -85,8 +90,14 @@ namespace EarthLiveSharp
             scraper.image_folder = Cfg.image_folder;
             scraper.image_source = Cfg.image_source;
             System.Threading.Thread.Sleep(10000); // wait 10 secs for Internet reconnection after system resume.
-            scraper.UpdateImage();
-            Wallpaper.Set(scraper.image_folder+"\\wallpaper.bmp");
+
+            Images = Directory.GetFiles(scraper.image_folder).Where(w => w.EndsWith(".bmp")).OrderBy(w => w).ToList();
+            timer3.Enabled = true;
+            timer3.Interval = 1000;
+            timer3.Stop();
+            timer3.Start();
+           await scraper.UpdateImage();
+
         }
 
         private void Form2_Deactivate(object sender, EventArgs e)
@@ -100,7 +111,7 @@ namespace EarthLiveSharp
                     notifyIcon1.ShowBalloonTip(1000, "", "EarthLive# is running", ToolTipIcon.Warning);
                 }
             }
-        }   
+        }
 
         private void notifyIcon1_MouseClick(object sender, MouseEventArgs e)
         {
@@ -152,13 +163,14 @@ namespace EarthLiveSharp
                 button_stop.Enabled = true;
                 button_settings.Enabled = false;
                 scraper.UpdateImage();
-                timer1.Interval = Cfg.interval * 1000 * 60;
+                timer1.Interval = Cfg.interval * 1000;
                 timer1.Start();
                 Wallpaper.SetDefaultStyle();
-                Wallpaper.Set(scraper.image_folder + "\\wallpaper.bmp");
+                //Wallpaper.Set(scraper.image_folder + "\\wallpaper.bmp");
                 serviceRunning = true;
                 runningLabel.Text = "    Running";
                 runningLabel.ForeColor = Color.DarkGreen;
+                timer1_Tick(null, null);
             }
             else
             {
@@ -188,5 +200,17 @@ namespace EarthLiveSharp
             scraper.CleanCDN();
         }
 
+        int ticks = 0;
+        private void timer3_Tick(object sender, EventArgs e)
+        {
+            if (Images != null && Images.Count > 0)
+            {
+                ticks++;
+                int index = ticks % (Images.Count - 1);
+                Wallpaper.Set(Images[index]);
+            }
+
+
+        }
     }
 }

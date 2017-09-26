@@ -1,11 +1,12 @@
 ﻿using System;
 using System.Windows.Forms;
 using System.Net;
-using System.Net.Cache;  
+using System.Net.Cache;
 using System.IO;
 using System.Diagnostics;
 using Microsoft.Win32;
 using System.Drawing;
+using System.Threading.Tasks;
 
 namespace EarthLiveSharp
 {
@@ -17,7 +18,7 @@ namespace EarthLiveSharp
         /// 应用程序的主入口点。
         /// </summary>
         [STAThread]
-        static void Main(string[] args) 
+        static void Main(string[] args)
         {
             if (System.Environment.OSVersion.Version.Major >= 6) { SetProcessDPIAware(); }
             if (File.Exists(Application.StartupPath + @"\trace.log"))
@@ -35,19 +36,20 @@ namespace EarthLiveSharp
             {
                 return;
             }
-            if (Cfg.source_selection ==0 & Cfg.cloud_name.Equals("demo"))
+            if (Cfg.source_selection == 0 & Cfg.cloud_name.Equals("demo"))
             {
-                #if DEBUG
+#if DEBUG
 
-                #else
+#else
                 DialogResult dr = MessageBox.Show("WARNING: it's recommended to get images from CDN. \n 注意：推荐使用CDN方式来抓取图片，以提高稳定性。", "EarthLiveSharp");
                 if (dr == DialogResult.OK)
                 {
                     Process.Start("https://github.com/bitdust/EarthLiveSharp/issues/32");
                 }
-                #endif
+#endif
             }
-            Cfg.image_folder = Application.StartupPath + @"\images";
+            var now = DateTime.Now;
+            Cfg.image_folder = Application.StartupPath + @"\images\" + now.ToString("yyyyMMdd");
             Cfg.Save();
             // scraper.image_source = "http://himawari8-dl.nict.go.jp/himawari8/img/D531106";
             Application.EnableVisualStyles();
@@ -68,7 +70,7 @@ namespace EarthLiveSharp
         private static int GetImageID()
         {
             HttpWebRequest request = WebRequest.Create(json_url) as HttpWebRequest;
-            try 
+            try
             {
                 HttpWebResponse response = request.GetResponse() as HttpWebResponse;
                 if (response.StatusCode != HttpStatusCode.OK)
@@ -81,7 +83,35 @@ namespace EarthLiveSharp
                 }
                 StreamReader reader = new StreamReader(response.GetResponseStream());
                 string date = reader.ReadToEnd();
-                imageID = date.Substring(9,19).Replace("-", "/").Replace(" ", "/").Replace(":", "");
+                imageID = date.Substring(9, 19).Replace("-", "/").Replace(" ", "/").Replace(":", "");
+                Trace.WriteLine("[get latest ImageID] " + imageID);
+                reader.Close();
+            }
+            catch (Exception e)
+            {
+                Trace.WriteLine(e.Message);
+                return -1;
+            }
+            return 0;
+        }
+
+        private static async Task<int> GetImageIdAsync()
+        {
+            HttpWebRequest request = WebRequest.Create(json_url) as HttpWebRequest;
+            try
+            {
+                HttpWebResponse response = request.GetResponse() as HttpWebResponse;
+                if (response.StatusCode != HttpStatusCode.OK)
+                {
+                    throw new Exception("[connection error]");
+                }
+                if (!response.ContentType.Contains("application/json"))
+                {
+                    throw new Exception("[no json recieved. your Internet connection is hijacked]");
+                }
+                StreamReader reader = new StreamReader(response.GetResponseStream());
+                string date = reader.ReadToEnd();
+                imageID = date.Substring(9, 19).Replace("-", "/").Replace(" ", "/").Replace(":", "");
                 Trace.WriteLine("[get latest ImageID] " + imageID);
                 reader.Close();
             }
@@ -114,7 +144,7 @@ namespace EarthLiveSharp
             catch (Exception e)
             {
                 Trace.WriteLine(e.Message + " " + imageID);
-                Trace.WriteLine(string.Format("[image_folder]{0} [image_source]{1} [size]{2}",image_folder,image_source,size));
+                Trace.WriteLine(string.Format("[image_folder]{0} [image_source]{1} [size]{2}", image_folder, image_source, size));
                 return -1;
             }
         }
@@ -129,27 +159,28 @@ namespace EarthLiveSharp
             {
                 for (int jj = 0; jj < size; jj++)
                 {
-                    tile[ii,jj] = Image.FromFile(string.Format("{0}\\{1}_{2}.png", image_folder, ii, jj));
+                    tile[ii, jj] = Image.FromFile(string.Format("{0}\\{1}_{2}.png", image_folder, ii, jj));
                     g.DrawImage(tile[ii, jj], 550 * ii, 550 * jj);
                     tile[ii, jj].Dispose();
                 }
             }
             g.Save();
             g.Dispose();
+            string index = imageID.Replace("/", "");
             if (zoom == 100)
             {
-                bitmap.Save(string.Format("{0}\\wallpaper.bmp", image_folder),System.Drawing.Imaging.ImageFormat.Bmp);
+                bitmap.Save(string.Format("{0}\\wallpaper_{1}.bmp", image_folder, index), System.Drawing.Imaging.ImageFormat.Bmp);
             }
-            else if (1 < zoom & zoom <100)
+            else if (1 < zoom & zoom < 100)
             {
-                int new_size = bitmap.Height * zoom/100;
+                int new_size = bitmap.Height * zoom / 100;
                 Bitmap zoom_bitmap = new Bitmap(new_size, new_size);
                 Graphics g_2 = Graphics.FromImage(zoom_bitmap);
                 g_2.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
                 g_2.DrawImage(bitmap, 0, 0, new_size, new_size);
                 g_2.Save();
                 g_2.Dispose();
-                zoom_bitmap.Save(string.Format("{0}\\wallpaper.bmp", image_folder),System.Drawing.Imaging.ImageFormat.Bmp);
+                zoom_bitmap.Save(string.Format("{0}\\wallpaper_{1}.bmp", image_folder, index), System.Drawing.Imaging.ImageFormat.Bmp);
                 zoom_bitmap.Dispose();
             }
             else
@@ -161,7 +192,7 @@ namespace EarthLiveSharp
 
         private static void InitFolder()
         {
-            if(Directory.Exists(image_folder))
+            if (Directory.Exists(image_folder))
             {
                 // delete all images in the image folder.
                 //string[] files = Directory.GetFiles(image_folder);
@@ -187,12 +218,31 @@ namespace EarthLiveSharp
             {
                 return;
             }
-            if (SaveImage()==0)
+            if (SaveImage() == 0)
             {
                 JoinImage();
             }
             return;
         }
+
+        public static async Task<bool> UpdateImageAsync()
+        {
+            InitFolder();
+            if (await GetImageID() == -1)
+            {
+                return false;
+            }
+            if (imageID.Equals(last_imageID))
+            {
+                return false;
+            }
+            if (SaveImage() == 0)
+            {
+                JoinImage();
+            }
+            return true;
+        }
+
         public static void CleanCDN()
         {
             Cfg.Load();
@@ -208,7 +258,7 @@ namespace EarthLiveSharp
                 HttpWebResponse response = null;
                 StreamReader reader = null;
                 string result = null;
-                for (int i = 0; i < 3;i++ ) // max 3 request each hour.
+                for (int i = 0; i < 3; i++) // max 3 request each hour.
                 {
                     response = request.GetResponse() as HttpWebResponse;
                     if (response.StatusCode != HttpStatusCode.OK)
@@ -273,7 +323,7 @@ namespace EarthLiveSharp
             }
             finally
             {
-                if(runKey!=null)
+                if (runKey != null)
                 {
                     runKey.Close();
                 }
