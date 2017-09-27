@@ -49,7 +49,7 @@ namespace EarthLiveSharp
 #endif
             }
             var now = DateTime.Now;
-            Cfg.image_folder = Application.StartupPath + @"\images\" + now.ToString("yyyyMMdd");
+            Cfg.image_folder = Application.StartupPath + @"\images\";
             Cfg.Save();
             // scraper.image_source = "http://himawari8-dl.nict.go.jp/himawari8/img/D531106";
             Application.EnableVisualStyles();
@@ -95,33 +95,6 @@ namespace EarthLiveSharp
             return 0;
         }
 
-        private static async Task<int> GetImageIdAsync()
-        {
-            HttpWebRequest request = WebRequest.Create(json_url) as HttpWebRequest;
-            try
-            {
-                HttpWebResponse response = request.GetResponse() as HttpWebResponse;
-                if (response.StatusCode != HttpStatusCode.OK)
-                {
-                    throw new Exception("[connection error]");
-                }
-                if (!response.ContentType.Contains("application/json"))
-                {
-                    throw new Exception("[no json recieved. your Internet connection is hijacked]");
-                }
-                StreamReader reader = new StreamReader(response.GetResponseStream());
-                string date = reader.ReadToEnd();
-                imageID = date.Substring(9, 19).Replace("-", "/").Replace(" ", "/").Replace(":", "");
-                Trace.WriteLine("[get latest ImageID] " + imageID);
-                reader.Close();
-            }
-            catch (Exception e)
-            {
-                Trace.WriteLine(e.Message);
-                return -1;
-            }
-            return 0;
-        }
 
         private static int SaveImage()
         {
@@ -133,7 +106,7 @@ namespace EarthLiveSharp
                     for (int jj = 0; jj < size; jj++)
                     {
                         string url = string.Format("{0}/{1}d/550/{2}_{3}_{4}.png", image_source, size, imageID, ii, jj);
-                        string image_path = string.Format("{0}\\{1}_{2}.png", image_folder, ii, jj); // remove the '/' in imageID
+                        string image_path = string.Format("{0}\\{1}_{2}.png", image_folder + imageID.Replace("/", ""), ii, jj); // remove the '/' in imageID
                         client.DownloadFile(url, image_path);
                     }
                 }
@@ -149,6 +122,7 @@ namespace EarthLiveSharp
             }
         }
 
+
         private static void JoinImage()
         {
             // join & convert the images to wallpaper.bmp
@@ -159,7 +133,7 @@ namespace EarthLiveSharp
             {
                 for (int jj = 0; jj < size; jj++)
                 {
-                    tile[ii, jj] = Image.FromFile(string.Format("{0}\\{1}_{2}.png", image_folder, ii, jj));
+                    tile[ii, jj] = Image.FromFile(string.Format("{0}\\{1}_{2}.png", image_folder + imageID.Replace("/", ""), ii, jj));
                     g.DrawImage(tile[ii, jj], 550 * ii, 550 * jj);
                     tile[ii, jj].Dispose();
                 }
@@ -192,7 +166,7 @@ namespace EarthLiveSharp
 
         private static void InitFolder()
         {
-            if (Directory.Exists(image_folder))
+            if (Directory.Exists(image_folder + imageID.Replace("/", "")))
             {
                 // delete all images in the image folder.
                 //string[] files = Directory.GetFiles(image_folder);
@@ -204,12 +178,11 @@ namespace EarthLiveSharp
             else
             {
                 Trace.WriteLine("[create folder]");
-                Directory.CreateDirectory(image_folder);
+                Directory.CreateDirectory(image_folder + imageID.Replace("/", ""));
             }
         }
         public static void UpdateImage()
         {
-            InitFolder();
             if (GetImageID() == -1)
             {
                 return;
@@ -218,6 +191,7 @@ namespace EarthLiveSharp
             {
                 return;
             }
+            InitFolder();
             if (SaveImage() == 0)
             {
                 JoinImage();
@@ -225,23 +199,6 @@ namespace EarthLiveSharp
             return;
         }
 
-        public static async Task<bool> UpdateImageAsync()
-        {
-            InitFolder();
-            if (await GetImageID() == -1)
-            {
-                return false;
-            }
-            if (imageID.Equals(last_imageID))
-            {
-                return false;
-            }
-            if (SaveImage() == 0)
-            {
-                JoinImage();
-            }
-            return true;
-        }
 
         public static void CleanCDN()
         {

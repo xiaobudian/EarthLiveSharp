@@ -4,6 +4,7 @@ using System.IO;
 using System.Windows.Forms;
 using System.Linq;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace EarthLiveSharp
 {
@@ -93,10 +94,10 @@ namespace EarthLiveSharp
 
             Images = Directory.GetFiles(scraper.image_folder).Where(w => w.EndsWith(".bmp")).OrderBy(w => w).ToList();
             timer3.Enabled = true;
-            timer3.Interval = 1000;
+            timer3.Interval = 100 * 1000 / Images.Count;
             timer3.Stop();
             timer3.Start();
-           await scraper.UpdateImage();
+            scraper.UpdateImage();
 
         }
 
@@ -163,7 +164,7 @@ namespace EarthLiveSharp
                 button_stop.Enabled = true;
                 button_settings.Enabled = false;
                 scraper.UpdateImage();
-                timer1.Interval = Cfg.interval * 1000;
+                timer1.Interval = Cfg.interval * 1000 * 60;
                 timer1.Start();
                 Wallpaper.SetDefaultStyle();
                 //Wallpaper.Set(scraper.image_folder + "\\wallpaper.bmp");
@@ -201,13 +202,35 @@ namespace EarthLiveSharp
         }
 
         int ticks = 0;
+        int direction = 1;
         private void timer3_Tick(object sender, EventArgs e)
         {
+          
             if (Images != null && Images.Count > 0)
             {
-                ticks++;
-                int index = ticks % (Images.Count - 1);
-                Wallpaper.Set(Images[index]);
+                if (direction == -1)
+                {
+                    ticks--;
+                }
+                else
+                {
+                    ticks++;
+                }
+
+
+                int index = ticks % (Images.Count);
+                if (index == Images.Count - 1)
+                {
+                    direction = -1;
+                }
+                if (index == 0)
+                {
+                    direction = 1;
+                }
+
+
+
+                Task.Run(() => Wallpaper.Set(Images[index]));
             }
 
 
