@@ -107,7 +107,10 @@ namespace EarthLiveSharp
                     {
                         string url = string.Format("{0}/{1}d/550/{2}_{3}_{4}.png", image_source, size, imageID, ii, jj);
                         string image_path = string.Format("{0}\\{1}_{2}.png", image_folder + imageID.Replace("/", ""), ii, jj); // remove the '/' in imageID
-                        client.DownloadFile(url, image_path);
+                        if (!File.Exists(image_path))
+                        {
+                            client.DownloadFile(url, image_path);
+                        }
                     }
                 }
                 Trace.WriteLine("[save image] " + imageID);
@@ -138,12 +141,14 @@ namespace EarthLiveSharp
                     tile[ii, jj].Dispose();
                 }
             }
+            g.DrawString(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), new Font("新宋体", 30f), new SolidBrush(Color.White), 0, 0);
             g.Save();
             g.Dispose();
             string index = imageID.Replace("/", "");
+            string path = string.Format("{0}\\wallpaper_{1}.bmp", image_folder, index);
             if (zoom == 100)
             {
-                bitmap.Save(string.Format("{0}\\wallpaper_{1}.bmp", image_folder, index), System.Drawing.Imaging.ImageFormat.Bmp);
+                bitmap.Save(path, System.Drawing.Imaging.ImageFormat.Bmp);
             }
             else if (1 < zoom & zoom < 100)
             {
@@ -154,13 +159,15 @@ namespace EarthLiveSharp
                 g_2.DrawImage(bitmap, 0, 0, new_size, new_size);
                 g_2.Save();
                 g_2.Dispose();
-                zoom_bitmap.Save(string.Format("{0}\\wallpaper_{1}.bmp", image_folder, index), System.Drawing.Imaging.ImageFormat.Bmp);
+
+                zoom_bitmap.Save(path, System.Drawing.Imaging.ImageFormat.Bmp);
                 zoom_bitmap.Dispose();
             }
             else
             {
                 Trace.WriteLine("[zoom error]");
             }
+            Task.Run(() => Wallpaper.Set(path));
             bitmap.Dispose();
         }
 
@@ -183,6 +190,13 @@ namespace EarthLiveSharp
         }
         public static void UpdateImage()
         {
+            var now = DateTime.Now;
+            var start = new DateTime(now.Year, now.Month, now.Day, 20, 0, 0);
+            var end = new DateTime(now.Year, now.Month, now.Day, 5, 0, 0);
+            if (now > start || now < end)
+            {
+                return;
+            }
             if (GetImageID() == -1)
             {
                 return;

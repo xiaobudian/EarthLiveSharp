@@ -92,11 +92,11 @@ namespace EarthLiveSharp
             scraper.image_source = Cfg.image_source;
             System.Threading.Thread.Sleep(10000); // wait 10 secs for Internet reconnection after system resume.
 
-            Images = Directory.GetFiles(scraper.image_folder).Where(w => w.EndsWith(".bmp")).OrderBy(w => w).ToList();
-            timer3.Enabled = true;
-            timer3.Interval = 100 * 1000 / Images.Count;
-            timer3.Stop();
-            timer3.Start();
+            //Images = Directory.GetFiles(scraper.image_folder).Where(w => w.EndsWith(".bmp")).OrderByDescending(w => w).Take(36).ToList().OrderBy(w => w).ToList();
+            //timer3.Enabled = true;
+            //timer3.Interval = 1000;
+            //timer3.Stop();
+            //timer3.Start();
             scraper.UpdateImage();
 
         }
@@ -205,28 +205,29 @@ namespace EarthLiveSharp
         int direction = 1;
         private void timer3_Tick(object sender, EventArgs e)
         {
-          
+
             if (Images != null && Images.Count > 0)
             {
-                if (direction == -1)
-                {
-                    ticks--;
-                }
-                else
-                {
-                    ticks++;
-                }
+                //if (direction == -1)
+                //{
+                //    ticks--;
+                //}
+                //else
+                //{
+                //    ticks++;
+                //}
 
 
                 int index = ticks % (Images.Count);
-                if (index == Images.Count - 1)
-                {
-                    direction = -1;
-                }
-                if (index == 0)
-                {
-                    direction = 1;
-                }
+                ticks++;
+                //if (index == Images.Count - 1)
+                //{
+                //    direction = -1;
+                //}
+                //if (index == 0)
+                //{
+                //    direction = 1;
+                //}
 
 
 
